@@ -1034,8 +1034,10 @@ button { box-sizing:border-box; margin:0; line-height:normal; } button::after { 
 .timer-option { width:100%; min-height:88rpx; border:0; border-bottom:1rpx solid rgba(255,255,255,.1); border-radius:0; background:transparent; padding:22rpx 4rpx; color:rgba(238,244,241,.72); font-size:28rpx; text-align:left; } .timer-option.selected { color:#fff; font-weight:850; }
 .effect-option { display:flex; width:100%; min-height:100rpx; align-items:center; justify-content:space-between; border:0; border-bottom:1rpx solid rgba(255,255,255,.1); border-radius:0; background:transparent; padding:18rpx 4rpx; text-align:left; } .effect-label { color:#f1f6f3; font-size:28rpx; font-weight:840; } .effect-description { margin-top:6rpx; color:rgba(224,234,229,.5); font-size:25rpx; } .effect-current { border-radius:999rpx; background:rgba(226,239,232,.16); padding:8rpx 14rpx; color:#eef5f1; font-size:24rpx; font-weight:820; }
 /* #ifdef H5 */
-.page-tint,.timer-mask { right:auto; left:50%; width:min(100vw,430px); transform:translateX(-50%); }
-.page-bg { top:-12%; right:auto; bottom:-12%; left:50%; width:min(124vw,533px); transform:translateX(-50%) scale(1.04); }
+@media (min-width: 431px) {
+  .page-tint,.timer-mask { right:auto; left:50%; width:430px; transform:translateX(-50%); }
+  .page-bg { top:-12%; right:auto; bottom:-12%; left:50%; width:533px; transform:translateX(-50%) scale(1.04); }
+}
 /* #endif */
 @media (min-width:540px) { .page { max-width:780rpx; margin:0 auto; } }
 

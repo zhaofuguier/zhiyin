@@ -48,14 +48,7 @@ button { font: inherit; touch-action: manipulation; }
 html,
 body {
   min-height: 100%;
-  background: #07090c;
-}
-
-@media (min-width: 431px) {
-  html {
-    font-size: 18.34667px !important;
-    scrollbar-gutter: stable;
-  }
+  background: var(--zy-bg);
 }
 
 body {
@@ -64,12 +57,11 @@ body {
 
 #app {
   position: relative;
-  width: min(100%, 430px);
+  width: 100%;
   min-height: 100vh;
-  margin: 0 auto;
+  margin: 0;
   overflow: visible;
   background: var(--zy-bg);
-  box-shadow: 0 0 56px rgba(0, 0, 0, 0.45);
 }
 
 uni-app,
@@ -77,15 +69,15 @@ uni-page,
 uni-page-wrapper,
 uni-page-body {
   width: 100%;
-  max-width: 430px;
+  max-width: none;
 }
 
 .uni-page-head,
 .uni-tabbar {
-  right: auto !important;
-  left: 50% !important;
-  width: min(100vw, 430px) !important;
-  transform: translateX(-50%) !important;
+  right: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  transform: none !important;
 }
 
 @media (max-width: 430px) {
@@ -97,9 +89,38 @@ uni-page-body {
   body::-webkit-scrollbar {
     display: none;
   }
+}
+
+@media (min-width: 431px) {
+  html,
+  body {
+    background: #07090c;
+  }
+
+  html {
+    font-size: 18.34667px !important;
+    scrollbar-gutter: stable;
+  }
 
   #app {
-    box-shadow: none;
+    width: 430px;
+    margin: 0 auto;
+    box-shadow: 0 0 56px rgba(0, 0, 0, 0.45);
+  }
+
+  uni-app,
+  uni-page,
+  uni-page-wrapper,
+  uni-page-body {
+    max-width: 430px;
+  }
+
+  .uni-page-head,
+  .uni-tabbar {
+    right: auto !important;
+    left: 50% !important;
+    width: 430px !important;
+    transform: translateX(-50%) !important;
   }
 }
 /* #endif */

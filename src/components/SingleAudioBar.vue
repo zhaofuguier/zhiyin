@@ -64,6 +64,8 @@ onUnmounted(() => { unsubscribe?.(); });
 button::after { border:0; }
 .bar-control { width:128rpx; font-size:24rpx; border-radius:999rpx; flex-shrink:0; }
 /* #ifdef H5 */
-.single-audio-bar { right:auto; left:50%; width:min(calc(100vw - 40rpx),390px); box-sizing:border-box; transform:translateX(-50%); }
+@media (min-width: 431px) {
+  .single-audio-bar { right:auto; left:50%; width:390px; box-sizing:border-box; transform:translateX(-50%); }
+}
 /* #endif */
 </style>
