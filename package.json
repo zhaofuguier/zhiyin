@@ -1,0 +1,39 @@
+{
+    "name":  "zhiyin-miniapp",
+    "version":  "0.1.0",
+    "private":  true,
+    "description":  "Zhiyin mini app frontend.",
+    "scripts":  {
+                    "dev:h5:demo":  "node tools/miniapp-build.cjs --mode=demo --platform=h5 --command=dev",
+                    "dev:mp-weixin":  "node tools/miniapp-build.cjs --mode=demo --platform=mp-weixin --command=dev",
+                    "dev:mp-toutiao":  "node tools/miniapp-build.cjs --mode=demo --platform=mp-toutiao --command=dev",
+                    "build:h5:demo":  "node tools/miniapp-build.cjs --mode=demo --platform=h5",
+                    "build:mp-weixin:demo":  "node tools/miniapp-build.cjs --mode=demo --platform=mp-weixin",
+                    "build:mp-toutiao:demo":  "node tools/miniapp-build.cjs --mode=demo --platform=mp-toutiao",
+                    "build:miniapps:demo":  "npm.cmd run build:mp-toutiao:demo \u0026\u0026 npm.cmd run build:mp-weixin:demo",
+                    "build:mp-weixin":  "npm.cmd run build:mp-weixin:demo",
+                    "build:mp-toutiao":  "npm.cmd run build:mp-toutiao:demo",
+                    "build:miniapps":  "npm.cmd run build:miniapps:demo",
+                    "build:mp-weixin:prod":  "node tools/miniapp-build.cjs --mode=production --platform=mp-weixin",
+                    "build:mp-toutiao:prod":  "node tools/miniapp-build.cjs --mode=production --platform=mp-toutiao",
+                    "build:miniapps:prod":  "npm.cmd run build:mp-toutiao:prod \u0026\u0026 npm.cmd run build:mp-weixin:prod",
+                    "typecheck":  "node ../../tools/verify-feedback-catalog.cjs && vue-tsc --noEmit",
+                    "test":  "node ../../tools/verify-feedback-catalog.cjs && node --experimental-strip-types --test test/*.test.ts"
+                },
+    "dependencies":  {
+                         "@dcloudio/uni-app":  "3.0.0-alpha-5010220260604001",
+                         "@dcloudio/uni-components":  "3.0.0-alpha-5010220260604001",
+                         "@dcloudio/uni-h5":  "3.0.0-alpha-5010220260604001",
+                         "@dcloudio/uni-mp-toutiao":  "3.0.0-alpha-5010220260604001",
+                         "@dcloudio/uni-mp-weixin":  "3.0.0-alpha-5010220260604001",
+                         "pinia":  "latest",
+                         "vue":  "latest"
+                     },
+    "devDependencies":  {
+                            "@dcloudio/types":  "3.4.31",
+                            "@dcloudio/vite-plugin-uni":  "3.0.0-alpha-5010220260604001",
+                            "typescript":  "latest",
+                            "vite":  "latest",
+                            "vue-tsc":  "latest"
+                        }
+}

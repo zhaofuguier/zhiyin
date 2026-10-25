@@ -1,0 +1,25 @@
+{
+    "name":  "Zhiyin",
+    "appid":  "__UNI__ZHIYIN",
+    "description":  "Music spaces for focused scenes.",
+    "versionName":  "0.1.0",
+    "versionCode":  "1",
+    "transformPx":  false,
+    "app-plus":  {
+                     "usingComponents":  true
+                 },
+    "mp-weixin":  {
+                      "appid":  "",
+                      "setting":  {
+                                      "urlCheck":  true
+                                  },
+                      "usingComponents":  true
+                  },
+    "mp-toutiao":  {
+                       "appid":  "",
+                       "setting":  {
+                                       "urlCheck":  true
+                                   },
+                       "usingComponents":  true
+                   }
+}
