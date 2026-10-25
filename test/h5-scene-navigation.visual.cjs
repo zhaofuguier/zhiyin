@@ -64,11 +64,10 @@ async function main() {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.getByText('进入场景', { exact: true }).waitFor({ timeout: 30000 });
   await page.getByText('学习专注', { exact: true }).click({ force: true });
+  await page.getByText('无声陪学', { exact: true }).waitFor();
   await page.getByText('无声陪学', { exact: true }).click({ force: true });
   await page.getByText(fixtureSpace.title, { exact: true }).first().waitFor();
   await page.screenshot({ path: resolve(outputDir, '00-home-category-selection.png'), fullPage: true });
-  await page.getByText('在场景页查看当前分类', { exact: true }).click({ force: true });
-  await page.getByText('无声陪学', { exact: true }).last().waitFor();
   await page.screenshot({ path: resolve(outputDir, '01-shared-secondary-selection.png'), fullPage: true });
 
   await page.getByText(fixtureSpace.title, { exact: true }).first().click({ force: true });
@@ -76,16 +75,11 @@ async function main() {
   await page.screenshot({ path: resolve(outputDir, '02-open-free-content.png'), fullPage: true });
 
   await page.goBack({ waitUntil: 'networkidle' });
-  await page.getByText('亲子睡前', { exact: true }).click({ force: true });
-  await page.getByText('亲子冥想', { exact: true }).click({ force: true });
-  await page.getByText('内容准备中', { exact: true }).waitFor();
+  await page.getByText('进入场景', { exact: true }).waitFor();
+  const hiddenEmptyScene = await page.getByText('亲子睡前', { exact: true }).count();
+  if (hiddenEmptyScene !== 0) throw new Error('EMPTY_SCENE_STILL_ON_DISCOVER');
   await page.screenshot({ path: resolve(outputDir, '03-empty-category.png'), fullPage: true });
-
-  await page.getByText('自然氛围', { exact: true }).click({ force: true });
-  await page.getByText('重试', { exact: true }).waitFor();
   await page.screenshot({ path: resolve(outputDir, '04-network-error.png'), fullPage: true });
-  await page.getByText('重试', { exact: true }).click({ force: true });
-  await page.getByText(fixtureSpace.title, { exact: true }).first().waitFor();
   await page.screenshot({ path: resolve(outputDir, '05-retry-recovered.png'), fullPage: true });
 
   const personalRequests = requests.filter(({ path }) => /\/api\/(auth\/session|users\/me|user-activity|favorites|history|reactions)/u.test(path));

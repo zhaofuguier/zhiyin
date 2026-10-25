@@ -7,7 +7,8 @@ import type { MusicSpace } from '../../types/music-space';
 import { getMusicSpaceDetail, getNextMusicSpaces } from '../../services/api';
 import { DEFAULT_COVER_IMAGE } from '../../services/assets';
 import { formatDuration } from '../../services/player';
-import { contentExperience, contentPlayLabel } from '../../services/content-experience';
+import { contentExperience, contentPlayLabel, hasVisibleContentForm } from '../../services/content-experience';
+import { sceneFormCaption } from '../../services/visible-catalog';
 import {
   ContentPlaybackEvidence,
   SILENT_PLAYBACK_SAVE_ERROR,
@@ -57,6 +58,10 @@ import {
 
 const space = ref<MusicSpace>();
 const experience = computed(() => contentExperience(space.value?.contentForm));
+const playbackCaption = computed(() => {
+  if (!space.value || !hasVisibleContentForm(space.value)) return '';
+  return `${sceneFormCaption(space.value)} · ${formatDuration(space.value.durationSeconds)}`;
+});
 const playLabel = computed(() => contentPlayLabel(space.value?.contentForm, isPlaying.value, currentTime.value, space.value?.durationSeconds || 0));
 const guidedCompleted = computed(() => experience.value.guided && !isPlaying.value && Boolean(space.value?.durationSeconds) && currentTime.value >= (space.value?.durationSeconds || 0));
 const nextSpaces = ref<MusicSpace[]>([]);
@@ -202,7 +207,7 @@ const playerContentLoader = new PlayerContentLoader(
       loadErrorMessage.value = requestErrorMessage(error);
     },
     applyNext(spaceId, items) {
-      if (space.value?.id === spaceId) nextSpaces.value = items;
+      if (space.value?.id === spaceId) nextSpaces.value = items.filter((item) => hasVisibleContentForm(item));
     },
     applyPersonal(spaceId, personal) {
       if (space.value?.id !== spaceId || personal.state === 'stale') return;
@@ -907,7 +912,7 @@ onShareAppMessage(() => {
       <view v-if="!presentation.immersive" class="player-heading">
         <text class="visual-title">{{ space.title }}</text>
         <text class="visual-copy">{{ space.atmosphereText }}</text>
-        <text class="experience-meta">{{ experience.label }} · {{ space.contentForm === 'silent-companion' ? '主动开始 · 画面循环' : '单条播放 · 结束后停止' }}</text>
+        <text v-if="playbackCaption" class="experience-meta">{{ playbackCaption }}</text>
       </view>
       <view v-if="presentation.immersive" class="minimal-controls">
         <button class="play-button" :aria-label="playLabel" @click="togglePlay"><text>{{ playLabel }}</text></button>
@@ -950,7 +955,7 @@ onShareAppMessage(() => {
         </view>
         <view v-if="presentation.panel === 'details'" class="classification-row">
           <text class="classification-primary">{{ space.primarySceneLabel || '待重新分类' }}</text>
-          <text class="classification-secondary">{{ experience.label }} · {{ experience.description }}</text>
+          <text v-if="playbackCaption" class="classification-secondary">{{ sceneFormCaption(space) }} · {{ experience.description }}</text>
           <text v-if="space.alsoSuitableLabels?.length" class="classification-secondary">也适合：{{ space.alsoSuitableLabels.join('、') }}</text>
           <text class="classification-secondary">{{ formatDuration(space.durationSeconds) }}</text>
         </view>
@@ -981,7 +986,7 @@ onShareAppMessage(() => {
       <view class="next-head"><text class="next-heading">接下来</text><text class="next-sub">同场景</text></view>
       <button v-for="item in nextSpaces.slice(0, 2)" :key="item.id" class="next-card" :disabled="Boolean(coListenRoom)" @click="playNext(item)">
         <image class="next-cover" :src="item.coverImageUrl" mode="aspectFill" @error="useFallbackCover(item)" />
-        <view class="next-copy"><text class="next-title">{{ item.title }}</text><text class="next-meta">{{ contentExperience(item.contentForm).label }} · {{ formatDuration(item.durationSeconds) }}</text></view>
+        <view class="next-copy"><text class="next-title">{{ item.title }}</text><text class="next-meta">{{ sceneFormCaption(item) }} · {{ formatDuration(item.durationSeconds) }}</text></view>
         <view class="next-play"><image class="next-play-icon" src="/static/tabbar/player-active.png" mode="aspectFit" /></view>
       </button>
     </view>
@@ -1016,7 +1021,7 @@ button { box-sizing:border-box; margin:0; line-height:normal; } button::after { 
 .classification-row { display:flex; flex-wrap:wrap; gap:10rpx 18rpx; margin-top:12rpx; } .classification-primary { color:#f1f7f4; font-size:25rpx; font-weight:800; } .classification-secondary { color:rgba(231,239,235,.6); font-size:24rpx; }
 .notice { margin-top:14rpx; border-radius:16rpx; background:rgba(151,117,62,.22); padding:13rpx 16rpx; color:#eed6aa; font-size:26rpx; line-height:1.4; }
 .save-notice { display:flex; align-items:center; gap:12rpx; margin-top:14rpx; } .save-notice .notice { flex:1; margin-top:0; } .save-retry { flex:0 0 auto; min-height:62rpx; border:1rpx solid rgba(238,214,170,.62); border-radius:6rpx; background:transparent; padding:0 16rpx; color:#eed6aa; font-size:24rpx; font-weight:800; }
-.progress-track { position:relative; height:36rpx; margin-top:16rpx; } .progress-track::before { content:''; position:absolute; top:16rpx; right:0; left:0; height:4rpx; border-radius:999rpx; background:rgba(235,242,238,.22); } .progress-fill { position:absolute; top:16rpx; left:0; height:4rpx; border-radius:999rpx; background:#f0f5f2; } .progress-slider { position:absolute; top:-22rpx; right:-18rpx; left:-18rpx; }
+.progress-track { position:relative; height:36rpx; margin-top:16rpx; } .progress-track::before { content:''; position:absolute; top:16rpx; right:0; left:0; height:4rpx; border-radius:999rpx; background:rgba(235,242,238,.22); } .progress-fill { position:absolute; top:16rpx; left:0; height:4rpx; border-radius:999rpx; background:#7ee7d6; } .progress-slider { position:absolute; top:-22rpx; right:-18rpx; left:-18rpx; }
 .time-row { display:flex; justify-content:space-between; color:rgba(229,238,233,.54); font-size:24rpx; font-variant-numeric:tabular-nums; }
 .control-actions { display:grid; grid-template-columns:1fr 118rpx 1fr 1fr; align-items:center; gap:12rpx; margin-top:18rpx; }
 .side-control { display:flex; min-width:0; min-height:160rpx; flex-direction:column; align-items:center; justify-content:center; border:0; border-radius:22rpx; background:transparent; padding:0 4rpx; color:rgba(239,245,242,.68); } .side-control.active { background:rgba(224,238,230,.1); color:#fff; } .side-control-title { font-size:25rpx; font-weight:820; } .side-control-label { margin-top:8rpx; font-size:23rpx; font-weight:650; white-space:nowrap; } .side-control-icon { width:34rpx; height:34rpx; filter:brightness(0) invert(1); opacity:.82; }

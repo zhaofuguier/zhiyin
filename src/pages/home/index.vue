@@ -4,14 +4,18 @@ import { onShow, onUnload } from '@dcloudio/uni-app';
 import RequestStatePanel from '../../components/RequestStatePanel.vue';
 import SingleAudioBar from '../../components/SingleAudioBar.vue';
 import type { MusicSpace } from '../../types/music-space';
-import { getHomeMusicPreview, getMusicSpacePage, type MusicSpaceSort } from '../../services/api';
+import { getHomeMusicPreview, getMusicSpaceDetail, getMusicSpacePage, type MusicSpaceSort } from '../../services/api';
 import { DEFAULT_COVER_IMAGE } from '../../services/assets';
+import { sceneCoverMap } from '../../demo/scene-covers';
 import { sceneTaxonomy, type PrimarySceneId, type SecondarySceneId } from '../../shared/scene-taxonomy.generated';
+import { API_BASE_URL } from '../../services/config';
 import { getNetworkState, requestErrorMessage } from '../../services/network';
 import { formatDuration } from '../../services/player';
-import { contentExperience } from '../../services/content-experience';
+import { hasVisibleContentForm } from '../../services/content-experience';
+import { sceneFormCaption, sceneStockFromSpaces } from '../../services/visible-catalog';
 import { applyTheme } from '../../services/theme';
 import type { PlayHistoryItem } from '../../services/user-activity';
+import { getPlayHistory } from '../../services/user-activity';
 import { loadOptionalLastPlayed } from '../../services/personal-content';
 import { LatestSceneQuery, saveSceneSelection } from '../../services/scene-browser';
 
@@ -35,8 +39,27 @@ const sceneQuery = new LatestSceneQuery({
   getSecondary: async (primarySceneId, secondarySceneId, sort) => (await getMusicSpacePage({ primarySceneId, secondarySceneId, sort, pageSize: 8 })).items
 });
 
-const recommendSpaces = computed(() => featuredSpaces.value.slice(1).length ? featuredSpaces.value.slice(1) : featuredSpaces.value);
-const previewSpaces = computed(() => [...homeFeaturedSpaces.value, ...latestSpaces.value]);
+const visibleFeatured = computed(() => featuredSpaces.value.filter((space) => hasVisibleContentForm(space)));
+const visiblePreview = computed(() => [...homeFeaturedSpaces.value, ...latestSpaces.value].filter((space) => hasVisibleContentForm(space)));
+const recommendSpaces = computed(() => {
+  const pool = visibleFeatured.value;
+  const rest = pool.slice(1);
+  return rest.length ? rest : pool;
+});
+const visibleHero = computed(() => visibleFeatured.value[0]);
+const continueSpace = computed(() => (
+  lastPlayed.value.space && hasVisibleContentForm(lastPlayed.value.space) ? lastPlayed.value.space : undefined
+));
+const entranceScenes = computed(() => {
+  const stock = sceneStockFromSpaces(visiblePreview.value);
+  return sceneTaxonomy.primaryScenes
+    .filter((scene) => stock.primaryIds.has(scene.id))
+    .map((scene) => ({
+      id: scene.id,
+      name: scene.name,
+      cover: sceneCoverMap[scene.id] || coverForPrimary(scene.id)
+    }));
+});
 
 loadHomeData();
 
@@ -65,9 +88,30 @@ async function loadHomeData() {
 }
 
 async function refreshLastPlayed() {
-  const result = await loadOptionalLastPlayed();
-  if (result.state === 'loaded') lastPlayed.value = { space: result.space, history: result.history };
-  else if (result.state !== 'stale') lastPlayed.value = {};
+  try {
+    const result = await loadOptionalLastPlayed();
+    if (result.state === 'loaded') {
+      lastPlayed.value = result.space && hasVisibleContentForm(result.space)
+        ? { space: result.space, history: result.history }
+        : {};
+      return;
+    }
+    if (result.state === 'stale') return;
+    if (result.state === 'anonymous' && !API_BASE_URL) {
+      const history = await getPlayHistory();
+      const latest = history[0];
+      if (!latest) {
+        lastPlayed.value = {};
+        return;
+      }
+      const space = await getMusicSpaceDetail(latest.musicSpaceId);
+      lastPlayed.value = space && hasVisibleContentForm(space) ? { space, history: latest } : {};
+      return;
+    }
+    lastPlayed.value = {};
+  } catch {
+    lastPlayed.value = {};
+  }
 }
 
 function refreshNetworkNotice() {
@@ -75,7 +119,8 @@ function refreshNetworkNotice() {
   networkNotice.value = state.status === 'online' ? '' : state.message;
 }
 
-function openPlayer(space: MusicSpace) {
+function openPlayer(space?: MusicSpace) {
+  if (!space || !hasVisibleContentForm(space)) return;
   uni.setStorageSync('currentMusicSpaceId', space.id);
   uni.navigateTo({ url: '/pages/player/index' });
 }
@@ -141,14 +186,8 @@ function clearScene() {
   if (!homeLoaded) void loadHomeData();
 }
 
-function openSelectedScene() {
-  const primarySceneId = selectedPrimarySceneId.value;
-  if (!primarySceneId) return;
-  saveSceneSelection({
-    primarySceneId,
-    secondarySceneId: selectedSecondarySceneId.value,
-    sort: selectedSort.value
-  });
+function openPrimaryScene(primarySceneId: PrimarySceneId) {
+  saveSceneSelection({ primarySceneId, sort: 'featured' });
   uni.switchTab({ url: '/pages/categories/index' });
 }
 
@@ -159,26 +198,23 @@ function retryHomeRequest() {
 }
 
 function shuffleSpaces() {
-  if (featuredSpaces.value.length <= 1) return;
-  featuredSpaces.value = [...featuredSpaces.value.slice(1), featuredSpaces.value[0]];
+  const visible = featuredSpaces.value.filter((space) => hasVisibleContentForm(space));
+  const hidden = featuredSpaces.value.filter((space) => !hasVisibleContentForm(space));
+  if (visible.length <= 1) return;
+  const rotated = [...visible.slice(1), visible[0]];
+  featuredSpaces.value = [...rotated, ...hidden];
   hero.value = featuredSpaces.value[0];
 }
 
-function formatDate(value?: string) {
-  if (!value) return '新近';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(5).replace('-', '.');
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${month}.${day}`;
+function coverForPrimary(primarySceneId: string) {
+  const space = visiblePreview.value.find((item) => item.scenePlacements?.some((placement) => placement.primarySceneId === primarySceneId));
+  return space?.coverImageUrl || DEFAULT_COVER_IMAGE;
 }
 
 function useFallbackCover(space?: MusicSpace) {
   if (!space || space.coverImageUrl === DEFAULT_COVER_IMAGE) return;
   space.coverImageUrl = DEFAULT_COVER_IMAGE;
 }
-
-function openScenes() { uni.switchTab({ url: '/pages/categories/index' }); }
 
 onShow(() => {
   applyTheme();
@@ -191,6 +227,7 @@ onUnload(() => { contentRequestRevision += 1; sceneQuery.invalidate(); });
 <template>
   <view class="page">
     <SingleAudioBar />
+    <text class="brand">知音</text>
     <view class="top-actions">
       <button class="search-pill" @click="openSearch">
         <text class="search-text">搜索场景、情绪、关键词</text>
@@ -200,92 +237,70 @@ onUnload(() => { contentRequestRevision += 1; sceneQuery.invalidate(); });
     <text v-if="networkNotice" class="notice">{{ networkNotice }}</text>
 
     <RequestStatePanel v-if="errorMessage && !isLoading" kind="error" :message="errorMessage" @retry="retryHomeRequest" />
-    <RequestStatePanel v-else-if="!isLoading && !selectedPrimarySceneId && !previewSpaces.length" kind="empty" message="内容准备中" />
+    <RequestStatePanel v-else-if="!isLoading && !selectedPrimarySceneId && !visiblePreview.length" kind="empty" message="内容准备中" />
 
     <view v-if="isLoading" class="loading-panel">
       <text class="loading-title">正在整理音乐空间</text>
       <text class="loading-copy">为你匹配适合此刻的声音和画面。</text>
     </view>
 
-    <view v-if="!isLoading && hero" class="section-head today-head">
-      <text>{{ selectedPrimarySceneId ? '为你推荐' : '找一个适合此刻的环境' }}</text>
+    <view v-if="!isLoading && entranceScenes.length" class="section-head scene-head">
+      <text>进入场景</text>
+      <text class="section-note">仅展示有内容</text>
     </view>
-    <button v-if="!isLoading && hero" class="hero-card" :aria-label="`打开${hero.title}`" @click="openPlayer(hero)">
-      <image class="hero-image" :src="hero.coverImageUrl" mode="aspectFill" @error="useFallbackCover(hero)" />
+    <view v-if="!isLoading && entranceScenes.length" class="scene-grid">
+      <button
+        v-for="scene in entranceScenes"
+        :key="scene.id"
+        class="scene-card"
+        @click="openPrimaryScene(scene.id)"
+      >
+        <image class="scene-cover" :src="scene.cover" mode="aspectFill" />
+        <view class="scene-shade"><text class="scene-name">{{ scene.name }}</text></view>
+      </button>
+    </view>
+
+    <view v-if="!isLoading && visibleHero" class="section-head today-head">
+      <text>今日音乐空间</text>
+    </view>
+    <view v-if="!isLoading && visibleHero" class="hero-card" :aria-label="`打开${visibleHero.title}`" @click="openPlayer(visibleHero)">
+      <image class="hero-image" :src="visibleHero.coverImageUrl" mode="aspectFill" @error="useFallbackCover(visibleHero)" />
       <view class="hero-shade">
-        <view class="hero-meta"><text class="hero-visual-type">{{ contentExperience(hero.contentForm).label }} · {{ formatDuration(hero.durationSeconds) }}</text></view>
+        <view class="hero-meta"><text class="hero-visual-type">{{ sceneFormCaption(visibleHero) }} · {{ formatDuration(visibleHero.durationSeconds) }}</text></view>
         <view class="hero-bottom">
-          <view class="hero-copy-wrap"><text class="hero-title">{{ hero.title }}</text><text class="hero-copy">{{ hero.atmosphereText }}</text></view>
-          <view class="hero-play-cue"><image class="hero-play-icon" src="/static/tabbar/player-active.png" mode="aspectFit" /></view>
+          <view class="hero-copy-wrap">
+            <text class="hero-title">{{ visibleHero.title }}</text>
+            <text class="hero-copy">{{ visibleHero.atmosphereText }}</text>
+          </view>
+          <button class="hero-play" aria-label="播放" @click.stop="openPlayer(visibleHero)">
+            <image class="hero-play-icon" src="/static/tabbar/player-active.png" mode="aspectFit" />
+          </button>
         </view>
       </view>
-    </button>
-
-    <view v-if="!isLoading" class="section-head scene-head">
-      <text>进入场景</text>
-      <button v-if="keyword" class="head-action" @click="clearScene">全部</button>
     </view>
 
-    <view v-if="!isLoading" class="scene-grid">
-      <button
-        v-for="scene in sceneTaxonomy.primaryScenes"
-        :key="scene.id"
-        :class="['scene-card', selectedPrimarySceneId === scene.id ? 'active' : '']"
-        @click="selectPrimaryScene(scene.id)"
-      >
-        <text class="scene-name">{{ scene.name }}</text>
-      </button>
-      <button class="scene-card scene-all" @click="openScenes"><text class="scene-name">全部场景 ›</text></button>
-    </view>
-
-    <scroll-view v-if="!isLoading && selectedPrimarySceneId" class="secondary-scroll" scroll-x>
-      <button v-for="item in sceneTaxonomy.primaryScenes.find((scene) => scene.id === selectedPrimarySceneId)?.children || []"
-        :key="item.id" :class="['secondary-chip', selectedSecondarySceneId === item.id ? 'active' : '']"
-        @click="selectSecondaryScene(item.id)">{{ item.name }}</button>
-    </scroll-view>
-
-    <button v-if="!isLoading && selectedPrimarySceneId" class="scene-enter" @click="openSelectedScene">
-      在场景页查看{{ selectedSecondarySceneId ? '当前分类' : '全部内容' }}
-    </button>
-
-    <view v-if="!isLoading && selectedPrimarySceneId && !featuredSpaces.length && !errorMessage" class="empty-scene">内容准备中</view>
-
-    <button v-if="lastPlayed.space && !isLoading" class="continue-card" @click="openPlayer(lastPlayed.space)">
-      <image class="continue-cover" :src="lastPlayed.space.coverImageUrl" mode="aspectFill" @error="useFallbackCover(lastPlayed.space)" />
+    <button v-if="continueSpace && !isLoading" class="continue-card" @click="openPlayer(continueSpace)">
+      <image class="continue-cover" :src="continueSpace.coverImageUrl" mode="aspectFill" @error="useFallbackCover(continueSpace)" />
       <view class="continue-copy">
         <text class="continue-label">继续播放</text>
-        <text class="continue-title">{{ lastPlayed.space.title }}</text>
+        <text class="continue-title">{{ continueSpace.title }}</text>
       </view>
       <image class="continue-play-icon" src="/static/tabbar/player-active.png" mode="aspectFit" />
     </button>
-    <view v-if="!isLoading" class="section-head recommend-head">
-      <text>{{ keyword ? `${keyword}空间` : '推荐空间' }}</text>
+
+    <view v-if="!isLoading && recommendSpaces.length" class="section-head recommend-head">
+      <text>推荐空间</text>
       <button class="head-action" @click="shuffleSpaces">换一批</button>
     </view>
-
-    <scroll-view v-if="!isLoading" class="recommend-scroll" scroll-x>
+    <scroll-view v-if="!isLoading && recommendSpaces.length" class="recommend-scroll" scroll-x>
       <button v-for="space in recommendSpaces" :key="space.id" class="recommend-card" @click="openPlayer(space)">
         <image class="recommend-image" :src="space.coverImageUrl" mode="aspectFill" @error="useFallbackCover(space)" />
         <view class="recommend-shade">
           <text class="recommend-title">{{ space.title }}</text>
-          <text class="recommend-meta">{{ contentExperience(space.contentForm).label }}</text>
-          <text class="recommend-meta">{{ formatDuration(space.durationSeconds) }}</text>
+          <text class="recommend-meta">{{ sceneFormCaption(space) }}</text>
         </view>
       </button>
     </scroll-view>
-
-    <view v-if="latestSpaces.length" class="section-head latest-head">
-      <text>新近上架</text>
-    </view>
-    <view class="latest-list">
-      <button v-for="space in latestSpaces" :key="space.id" class="latest-row" @click="openPlayer(space)">
-        <image class="latest-cover" :src="space.coverImageUrl" mode="aspectFill" @error="useFallbackCover(space)" />
-        <view class="latest-copy">
-          <text class="latest-title">{{ space.title }}</text>
-          <text class="latest-meta">{{ contentExperience(space.contentForm).label }} · {{ formatDuration(space.durationSeconds) }}</text>
-        </view>
-      </button>
-    </view>
   </view>
 </template>
 
@@ -293,193 +308,135 @@ onUnload(() => { contentRequestRevision += 1; sceneQuery.invalidate(); });
 .page {
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 22rpx 24rpx calc(180rpx + env(safe-area-inset-bottom));
-  background: #f5f7f4;
-  color: #12312d;
-  -webkit-font-smoothing: antialiased;
+  padding: calc(28rpx + env(safe-area-inset-top)) 24rpx calc(180rpx + env(safe-area-inset-bottom));
+  background: #0b0f14;
+  color: #eef3f7;
 }
 button { box-sizing: border-box; line-height: normal; margin: 0; touch-action: manipulation; }
 button::after { border: 0; }
 text { display: block; }
+.brand { margin: 8rpx 4rpx 22rpx; color: #f4f7fb; font-size: 48rpx; font-weight: 760; letter-spacing: 1rpx; }
 .top-actions { display: flex; gap: 16rpx; align-items: center; }
 .search-pill {
   flex: 1;
   display: flex;
   align-items: center;
-  min-height: 72rpx;
-  border: 2rpx solid #d8e1dd;
+  min-height: 80rpx;
+  border: 0;
   border-radius: 999rpx;
-  background: #fff;
-  padding: 20rpx 24rpx;
-  color: #7a8885;
+  background: #161c24;
+  padding: 20rpx 28rpx;
+  color: #8b97a6;
   font-size: 28rpx;
   text-align: left;
-  box-shadow: 0 8rpx 24rpx rgba(20,43,39,.04);
 }
 .search-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.notice {
-  margin-top: 14rpx;
-  border-radius: 18rpx;
-  background: rgba(23,103,93,.08);
-  padding: 14rpx 20rpx;
-  color: #49635e;
-  font-size: 28rpx;
-}
-.loading-panel { margin-top: 22rpx; border-radius: 30rpx; background: #fff; padding: 34rpx; }
-.loading-title { color: #12312d; font-size: 34rpx; font-weight: 900; }
-.loading-copy { margin-top: 8rpx; color: #72827f; font-size: 28rpx; }
+.notice { margin-top: 14rpx; border-radius: 18rpx; background: #161c24; padding: 14rpx 20rpx; color: #b7c3ce; font-size: 28rpx; }
+.loading-panel { margin-top: 22rpx; border-radius: 28rpx; background: #161c24; padding: 34rpx; }
+.loading-title { color: #f4f7fb; font-size: 34rpx; font-weight: 760; }
+.loading-copy { margin-top: 8rpx; color: #8b97a6; font-size: 28rpx; }
 .section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 30rpx 2rpx 16rpx;
-  color: #12312d;
+  margin: 34rpx 4rpx 16rpx;
+  color: #f4f7fb;
   font-size: 34rpx;
-  font-weight: 900;
-  line-height: 1.15;
-  letter-spacing: .2rpx;
+  font-weight: 760;
 }
-.head-action { border: 0; background: transparent; color: #58706b; font-size: 28rpx; font-weight: 800; }
-.scene-head { margin-top: 30rpx; }
-.secondary-scroll { width:100%; margin-top:16rpx; white-space:nowrap; }
-.secondary-chip { display:inline-flex; min-height:66rpx; align-items:center; margin-right:12rpx; border:1rpx solid #cbd9d4; border-radius:999rpx; background:#fff; padding:0 24rpx; color:#35544d; font-size:25rpx; }
-.secondary-chip.active { border-color:#17675d; background:#17675d; color:#fff; }
-.scene-enter { width:100%; margin-top:14rpx; border:1rpx solid #cbd9d4; border-radius:18rpx; background:#fff; padding:18rpx; color:#17675d; font-size:27rpx; font-weight:800; }
-.empty-scene { margin-top:20rpx; padding:50rpx 20rpx; color:#73827e; text-align:center; }
-.scene-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12rpx; }
+.section-note { color: #8b97a6; font-size: 24rpx; font-weight: 500; }
+.head-action { border: 0; background: transparent; color: #7ee7d6; font-size: 28rpx; font-weight: 700; }
+.scene-head { margin-top: 32rpx; }
+.scene-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16rpx; }
 .scene-card {
   position: relative;
   overflow: hidden;
   width: 100%;
-  min-height: 88rpx;
+  height: 196rpx;
+  border: 0;
+  border-radius: 28rpx;
+  background: #161c24;
+  padding: 0;
+}
+.scene-cover { width: 100%; height: 100%; }
+.scene-shade {
+  position: absolute;
+  inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2rpx solid #d8e1dd;
-  border-radius: 18rpx;
-  background: #fff;
-  padding: 12rpx 4rpx;
-  text-align: center;
+  align-items: flex-end;
+  padding: 18rpx 20rpx;
+  background: linear-gradient(180deg, rgba(8, 12, 16, .05), rgba(8, 12, 16, .78));
 }
-.scene-card.active { border-color: #17675d; background: #17675d; }
-.scene-card.active .scene-name { color: #fff; }
-.scene-all { background: #eaf1ed; }
-.scene-name {
-  color: #294b46;
-  font-size: 25rpx;
-  font-weight: 750;
-  line-height: 1.4;
-}
-.today-head { margin-top: 34rpx; }
+.scene-name { color: #fff; font-size: 30rpx; font-weight: 760; }
+.today-head { margin-top: 36rpx; }
 .hero-card {
   position: relative;
   overflow: hidden;
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 9;
-  border: 2rpx solid #d6dfdb;
-  border-radius: 28rpx;
-  background: #dbe5e1;
-  padding: 0;
-  text-align: left;
-  box-shadow: 0 18rpx 46rpx rgba(20,43,39,.12);
+  border: 0;
+  border-radius: 32rpx;
+  background: #161c24;
 }
-.hero-image, .recommend-image { width: 100%; height: 100%; filter: saturate(.9) contrast(1.02) brightness(.94); }
+.hero-image, .recommend-image { width: 100%; height: 100%; }
 .hero-shade {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 26rpx;
-  background: linear-gradient(180deg,rgba(7,18,28,.12),rgba(7,18,28,.02) 36%,rgba(7,18,28,.82));
+  padding: 24rpx;
+  background: linear-gradient(180deg, rgba(8, 12, 16, .12), rgba(8, 12, 16, .08) 38%, rgba(8, 12, 16, .86));
 }
-.hero-meta, .hero-bottom, .continue-card, .latest-row {
+.hero-meta, .hero-bottom, .continue-card { display: flex; align-items: center; justify-content: space-between; }
+.hero-visual-type { color: rgba(255,255,255,.86); font-size: 24rpx; font-weight: 650; }
+.hero-copy-wrap, .continue-copy { flex: 1; min-width: 0; }
+.hero-title { color: #fff; font-size: 40rpx; font-weight: 780; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-copy { margin-top: 8rpx; color: rgba(255,255,255,.82); font-size: 26rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-play {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.hero-visual-type {
-  align-self: flex-start;
-  border-radius: 999rpx;
-  background: rgba(8,28,28,.48);
-  padding: 9rpx 16rpx;
-  color: #fff;
-  font-size: 26rpx;
-  font-weight: 800;
-}
-.hero-copy-wrap, .continue-copy, .latest-copy { flex: 1; min-width: 0; }
-.hero-title {
-  color: #fff;
-  font-size: 42rpx;
-  font-weight: 900;
-  line-height: 1.15;
-  letter-spacing: .3rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hero-copy {
-  margin-top: 10rpx;
-  color: rgba(255,255,255,.86);
-  font-size: 28rpx;
-  font-weight: 700;
-  line-height: 1.35;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hero-play-cue {
-  display: flex;
-  width: 88rpx;
-  height: 88rpx;
-  flex: 0 0 88rpx;
+  width: 92rpx;
+  height: 92rpx;
+  flex: 0 0 92rpx;
   align-items: center;
   justify-content: center;
   margin-left: 18rpx;
-  border: 2rpx solid rgba(255,255,255,.55);
+  border: 0;
   border-radius: 50%;
-  background: rgba(255,255,255,.12);
+  background: #fff;
+  padding: 0;
 }
-.hero-play-icon { width: 30rpx; height: 30rpx; filter: brightness(0) invert(1); }
+.hero-play-icon { width: 30rpx; height: 30rpx; margin-left: 4rpx; }
 .continue-card {
   width: 100%;
-  margin-top: 16rpx;
-  border: 2rpx solid #dbe3df;
-  border-radius: 22rpx;
-  background: rgba(255,255,255,.82);
+  margin-top: 18rpx;
+  border: 0;
+  border-radius: 24rpx;
+  background: #161c24;
   padding: 14rpx;
   text-align: left;
-  box-shadow: 0 8rpx 24rpx rgba(20,43,39,.045);
 }
-.continue-cover { width: 96rpx; height: auto; aspect-ratio: 16 / 9; border-radius: 12rpx; margin-right: 16rpx; filter: saturate(.88) contrast(1.02); }
-.continue-label { color: #7c8b88; font-size: 26rpx; font-weight: 800; }
-.continue-title, .latest-title {
-  color: #12312d;
-  font-size: 30rpx;
-  font-weight: 900;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.continue-play-icon { width: 44rpx; height: 44rpx; margin: 0 10rpx 0 18rpx; opacity: .82; }
-.recommend-head { margin-top: 34rpx; }
-.recommend-scroll { width: 100%; height: 242rpx; white-space: nowrap; scrollbar-width: none; }
-.recommend-scroll :deep(.uni-scroll-view)::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.continue-cover { width: 96rpx; height: auto; aspect-ratio: 16 / 9; border-radius: 14rpx; margin-right: 16rpx; }
+.continue-label { color: #7ee7d6; font-size: 24rpx; font-weight: 700; }
+.continue-title { color: #f4f7fb; font-size: 30rpx; font-weight: 740; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.continue-play-icon { width: 36rpx; height: 36rpx; margin: 0 12rpx 0 16rpx; filter: brightness(0) invert(1); }
+.recommend-head { margin-top: 36rpx; }
+.recommend-scroll { width: 100%; height: 250rpx; white-space: nowrap; }
 .recommend-card {
   position: relative;
   display: inline-block;
   overflow: hidden;
-  width: 430rpx;
+  width: 420rpx;
   height: auto;
   aspect-ratio: 16 / 9;
   margin-right: 16rpx;
-  border: 2rpx solid #d6dfdb;
+  border: 0;
   border-radius: 24rpx;
-  background: #d8e0de;
+  background: #161c24;
   padding: 0;
   text-align: left;
-  box-shadow: 0 10rpx 28rpx rgba(20,43,39,.08);
+  vertical-align: top;
 }
 .recommend-shade {
   position: absolute;
@@ -487,44 +444,10 @@ text { display: block; }
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 20rpx;
-  background: linear-gradient(180deg,rgba(5,16,18,.02) 30%,rgba(5,16,18,.78));
+  padding: 18rpx;
+  background: linear-gradient(180deg, rgba(8,12,16,.02) 28%, rgba(8,12,16,.82));
 }
-.recommend-title {
-  color: #fff;
-  font-size: 30rpx;
-  font-weight: 900;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.recommend-meta { margin-top: 6rpx; color: rgba(255,255,255,.8); font-size: 26rpx; }
-.latest-list { display: grid; gap: 14rpx; }
-.latest-row {
-  width: 100%;
-  border: 2rpx solid #e0e6e3;
-  border-radius: 22rpx;
-  background: rgba(255,255,255,.72);
-  padding: 14rpx;
-  text-align: left;
-  box-shadow: 0 8rpx 24rpx rgba(20,43,39,.035);
-}
-.latest-cover { width: 136rpx; height: auto; aspect-ratio: 16 / 9; border-radius: 14rpx; margin-right: 16rpx; filter: saturate(.88) contrast(1.02); }
-.latest-meta {
-  margin-top: 6rpx;
-  color: #73827f;
-  font-size: 26rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.scene-card:active,
-.hero-card:active,
-.continue-card:active,
-.recommend-card:active,
-.latest-row:active,
-.search-pill:active,
-.head-action:active { opacity: .88; }
+.recommend-title { color: #fff; font-size: 28rpx; font-weight: 760; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recommend-meta { margin-top: 6rpx; color: rgba(255,255,255,.8); font-size: 24rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scene-card:active, .hero-card:active, .continue-card:active, .recommend-card:active, .search-pill:active, .head-action:active, .hero-play:active { opacity: .88; }
 </style>
-
-

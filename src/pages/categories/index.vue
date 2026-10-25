@@ -8,7 +8,9 @@ import { getMusicSpacePage, type MusicSpaceSort } from '../../services/api';
 import { DEFAULT_COVER_IMAGE } from '../../services/assets';
 import { sceneTaxonomy, findPrimaryScene, type PrimarySceneId, type SecondarySceneId } from '../../shared/scene-taxonomy.generated';
 import { formatDuration } from '../../services/player';
-import { contentExperience } from '../../services/content-experience';
+import { contentExperience, hasVisibleContentForm } from '../../services/content-experience';
+import { loadCatalogSceneStock } from '../../services/scene-stock';
+import type { SceneStock } from '../../services/visible-catalog';
 import { applyTheme } from '../../services/theme';
 import { requestErrorMessage } from '../../services/network';
 import {
@@ -42,6 +44,7 @@ let loadedSelectionKey = '';
 let initialSelection: SceneSelection | undefined;
 
 const query = new LatestScenePageQuery(getMusicSpacePage);
+const stock = ref<SceneStock>({ ready: false, primaryIds: new Set(), secondaryKeys: new Set(), unknownPrimaryIds: new Set() });
 
 const selectedPrimary = computed(() => findPrimaryScene(selectedPrimarySceneId.value));
 const selectedSecondary = computed(() => selectedPrimary.value?.children
@@ -51,6 +54,18 @@ const currentDescription = computed(() => selectedSecondary.value
   ? selectedPrimary.value?.name || ''
   : '全部分类');
 const sortIndex = computed(() => sortTabs.findIndex(item => item.value === selectedSort.value));
+const visiblePrimaryScenes = computed(() => {
+  if (!stock.value.ready) return [];
+  return sceneTaxonomy.primaryScenes.filter((scene) =>
+    stock.value.primaryIds.has(scene.id) || stock.value.unknownPrimaryIds.has(scene.id));
+});
+const visibleSecondaries = computed(() => {
+  const children = selectedPrimary.value?.children || [];
+  if (!stock.value.ready) return [];
+  if (stock.value.unknownPrimaryIds.has(selectedPrimarySceneId.value)) return [...children];
+  return children.filter((child) => stock.value.secondaryKeys.has(`${selectedPrimarySceneId.value}:${child.id}`));
+});
+const visibleSpaces = computed(() => spaces.value.filter((space) => hasVisibleContentForm(space)));
 function chooseSort() {
   uni.showActionSheet({
     itemList: sortLabels,
@@ -138,32 +153,6 @@ function retryCurrentSelection() {
   });
 }
 
-function getCardBadge(space: MusicSpace) {
-  if (selectedSort.value === 'latest') return formatPublishDate(space.updatedAt);
-  if (selectedSort.value === 'hot') return formatHotText(space);
-  return '精选';
-}
-
-function formatPublishDate(value?: string) {
-  if (!value) return '新近';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(5).replace('-', '.');
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${month}.${day}`;
-}
-
-function hotScore(space: MusicSpace) {
-  return (space.playCount || 0) + (space.favoriteCount || 0) * 4 + Math.round((space.completionRate || 0) * 1000);
-}
-
-function formatHotText(space: MusicSpace) {
-  const score = hotScore(space);
-  if (score >= 10000) return `${(score / 10000).toFixed(1)}万`;
-  if (score > 0) return `${score}`;
-  return '热度';
-}
-
 function openPlayer(space: MusicSpace) {
   uni.setStorageSync('currentMusicSpaceId', space.id);
   uni.navigateTo({ url: '/pages/player/index' });
@@ -189,6 +178,14 @@ onLoad((options) => {
 
 onShow(() => {
   applyTheme();
+  void loadCatalogSceneStock().then((value) => { stock.value = value; }).catch(() => {
+    stock.value = {
+      ready: true,
+      primaryIds: new Set(),
+      secondaryKeys: new Set(),
+      unknownPrimaryIds: new Set(sceneTaxonomy.primaryScenes.map((scene) => scene.id))
+    };
+  });
   const selection = initialSelection || loadSceneSelection() || { primarySceneId: initialPrimary, sort: 'featured' };
   initialSelection = undefined;
   if (loadedSelectionKey === selectionKey(selection)) return;
@@ -201,9 +198,10 @@ onUnload(() => query.invalidate());
 <template>
   <view class="page">
     <SingleAudioBar />
-    <scroll-view class="category-scroll" scroll-x :show-scrollbar="false">
+    <button class="back-link" @click="browseRecommendations">‹ 发现</button>
+    <scroll-view v-if="visiblePrimaryScenes.length" class="category-scroll" scroll-x :show-scrollbar="false">
       <button
-        v-for="item in sceneTaxonomy.primaryScenes"
+        v-for="item in visiblePrimaryScenes"
         :key="item.id"
         :class="['category-chip', item.id === selectedPrimarySceneId ? 'active' : '']"
         @click="selectPrimary(item.id)"
@@ -212,10 +210,10 @@ onUnload(() => query.invalidate());
       </button>
     </scroll-view>
 
-    <scroll-view class="secondary-scroll" scroll-x :show-scrollbar="false">
+    <scroll-view v-if="visibleSecondaries.length" class="secondary-scroll" scroll-x :show-scrollbar="false">
       <button :class="['secondary-chip', !selectedSecondarySceneId ? 'active' : '']" @click="selectSecondary()">全部</button>
       <button
-        v-for="item in selectedPrimary?.children || []"
+        v-for="item in visibleSecondaries"
         :key="item.id"
         :class="['secondary-chip', item.id === selectedSecondarySceneId ? 'active' : '']"
         @click="selectSecondary(item.id)"
@@ -227,7 +225,7 @@ onUnload(() => query.invalidate());
     <view class="section-head">
       <view>
         <text class="section-title">{{ currentTitle }}</text>
-        <text class="section-copy">{{ currentDescription }}</text>
+        <text class="section-copy">{{ isLoading ? currentDescription : `${visibleSpaces.length} 个可播空间 · 空分类已隐藏` }}</text>
       </view>
       <button class="sort-control" :aria-label="`排序：${sortTabs[sortIndex]?.label}`" @click="chooseSort">{{ sortTabs[sortIndex]?.label }}排序⌄</button>
     </view>
@@ -239,22 +237,20 @@ onUnload(() => query.invalidate());
       <text class="empty-copy">正在寻找适合此刻的声音。</text>
     </view>
 
-    <view v-else-if="spaces.length === 0" class="empty-panel">
+    <view v-else-if="visibleSpaces.length === 0" class="empty-panel">
       <text class="empty-title">内容准备中</text>
       <text class="empty-copy">试试上方其他分类，或先听听推荐内容。</text>
       <button class="empty-action" @click="browseRecommendations">返回推荐</button>
     </view>
 
     <view v-else class="space-list">
-      <button v-for="space in spaces" :key="space.id" class="space-card" @click="openPlayer(space)">
+      <button v-for="space in visibleSpaces" :key="space.id" class="space-row" @click="openPlayer(space)">
         <image class="cover" :src="space.coverImageUrl" mode="aspectFill" @error="useFallbackCover(space)" />
-        <view class="space-shade">
-          <view class="space-copy">
-            <text class="space-title">{{ space.title }}</text>
-            <text class="space-subtitle">{{ contentExperience(space.contentForm).label }} · {{ formatDuration(space.durationSeconds) }}</text>
-          </view>
-          <text class="space-meta">{{ getCardBadge(space) }}</text>
+        <view class="space-copy">
+          <text class="space-title">{{ space.title }}</text>
+          <text class="space-subtitle">{{ contentExperience(space.contentForm).label }} · {{ formatDuration(space.durationSeconds) }}</text>
         </view>
+        <view class="row-play" aria-hidden="true"><image class="row-play-icon" src="/static/tabbar/player-active.png" mode="aspectFit" /></view>
       </button>
     </view>
     <view v-if="!isLoading && !errorMessage && (spaces.length || currentPage > 1)" class="pagination">
@@ -271,38 +267,37 @@ onUnload(() => query.invalidate());
 </template>
 
 <style scoped>
-.page { min-height: 100vh; box-sizing: border-box; padding: 22rpx 24rpx calc(180rpx + env(safe-area-inset-bottom)); background: #f5f7f4; color: #12312d; -webkit-font-smoothing: antialiased; }
-.pagination { margin-top: 24rpx; }
+.page { min-height: 100vh; box-sizing: border-box; padding: calc(24rpx + env(safe-area-inset-top)) 24rpx calc(180rpx + env(safe-area-inset-bottom)); background: #0b0f14; color: #eef3f7; }
+.back-link { border: 0; background: transparent; padding: 0 0 8rpx; color: #8b97a6; font-size: 26rpx; text-align: left; }
+.pagination { margin-top: 24rpx; color: #c5d0da; }
 .pagination-actions { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
-.pagination-actions button { padding: 20rpx 30rpx; border-radius: 20rpx; background: #17675d; color: #fff; font-size: 28rpx; }
+.pagination-actions button { padding: 20rpx 30rpx; border-radius: 20rpx; background: #161c24; color: #7ee7d6; font-size: 28rpx; }
 .pagination-actions button[disabled] { opacity: .4; }
-.pagination-note { margin-top: 16rpx; color: #6f807d; font-size: 26rpx; }
-.pagination-refresh { margin: 16rpx auto 0; background: transparent; color: #17675d; font-size: 26rpx; }
+.pagination-note { margin-top: 16rpx; color: #8b97a6; font-size: 26rpx; }
+.pagination-refresh { margin: 16rpx auto 0; background: transparent; color: #7ee7d6; font-size: 26rpx; }
 button { box-sizing: border-box; line-height: normal; margin: 0; }
 button::after { border: 0; }
 text { display: block; }
-.category-scroll, .secondary-scroll { width: 100%; height: 68rpx; white-space: nowrap; scrollbar-width: none; }
+.category-scroll, .secondary-scroll { width: 100%; height: 72rpx; white-space: nowrap; }
 .secondary-scroll { margin-top: 14rpx; }
-.category-scroll :deep(.uni-scroll-view)::-webkit-scrollbar,
-.secondary-scroll :deep(.uni-scroll-view)::-webkit-scrollbar { display: none; width: 0; height: 0; }
-.category-chip, .secondary-chip { display: inline-flex; height: 68rpx; align-items: center; justify-content: center; margin-right: 12rpx; border: 1rpx solid #d4dfdb; border-radius: 999rpx; background: rgba(255,255,255,.92); padding: 0 24rpx; color: #294b46; font-size: 28rpx; font-weight: 850; }
+.category-chip, .secondary-chip { display: inline-flex; height: 68rpx; align-items: center; justify-content: center; margin-right: 12rpx; border: 0; border-radius: 999rpx; background: #161c24; padding: 0 24rpx; color: #d5dee6; font-size: 26rpx; font-weight: 700; }
 .category-chip { min-width: 140rpx; }
-.secondary-chip { min-width: 100rpx; font-size: 26rpx; }
-.category-chip.active, .secondary-chip.active { border-color: #17675d; background: #17675d; color: #fff; }
-.section-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin: 24rpx 4rpx 18rpx; }
-.section-title { color: #12312d; font-size: 36rpx; font-weight: 900; }
-.section-copy { margin-top: 8rpx; color: #6f807d; font-size: 28rpx; font-weight: 650; }
-.sort-control { display:flex; align-items:center; min-height:88rpx; padding:0 16rpx; background:transparent; color:#35544d; font-size:26rpx; white-space:nowrap; }
-.empty-action { min-height:88rpx; margin-top:24rpx; padding:20rpx 28rpx; border-radius:999rpx; background:#17675d; color:#fff; font-size:28rpx; }
+.secondary-chip { min-width: 100rpx; }
+.category-chip.active, .secondary-chip.active { background: #1c3f3a; color: #7ee7d6; }
+.section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16rpx; margin: 28rpx 4rpx 18rpx; }
+.section-title { color: #f4f7fb; font-size: 44rpx; font-weight: 760; }
+.section-copy { margin-top: 8rpx; color: #8b97a6; font-size: 24rpx; }
+.sort-control { display:flex; align-items:center; min-height:88rpx; padding:0 8rpx; background:transparent; color:#7ee7d6; font-size:26rpx; white-space:nowrap; }
+.empty-action { min-height:88rpx; margin-top:24rpx; padding:20rpx 28rpx; border-radius:999rpx; background:#7ee7d6; color:#0b0f14; font-size:28rpx; }
 .space-list { display: flex; flex-direction: column; gap: 18rpx; }
-.space-card { position: relative; overflow: hidden; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 2rpx solid #d6dfdb; border-radius: 28rpx; background: #d8e0de; padding: 0; text-align: left; box-shadow: 0 14rpx 36rpx rgba(20,43,39,.09); }
-.cover { width: 100%; height: 100%; filter: saturate(.88) contrast(1.02) brightness(.94); }
-.space-shade { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 16rpx; padding: 24rpx; background: linear-gradient(180deg,transparent 20%,rgba(5,16,18,.82)); }
+.space-row { display: flex; width: 100%; align-items: center; gap: 16rpx; border: 0; border-radius: 24rpx; background: transparent; padding: 8rpx 0; text-align: left; }
+.cover { width: 148rpx; height: 112rpx; border-radius: 18rpx; background: #161c24; }
 .space-copy { flex: 1; min-width: 0; }
-.space-title { color: #fff; font-size: 34rpx; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.space-subtitle { margin-top: 8rpx; color: rgba(255,255,255,.78); font-size: 28rpx; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.space-meta { border-radius: 999rpx; background: rgba(255,255,255,.2); padding: 10rpx 16rpx; color: #fff; font-size: 26rpx; font-weight: 850; }
-.empty-panel { border: 1rpx solid rgba(33,79,72,.08); border-radius: 30rpx; background: rgba(255,255,255,.9); padding: 30rpx; }
-.empty-title { color: #12312d; font-size: 34rpx; font-weight: 850; }
-.empty-copy { margin-top: 8rpx; color: #73827f; font-size: 28rpx; line-height: 1.45; }
+.space-title { color: #f4f7fb; font-size: 30rpx; font-weight: 740; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.space-subtitle { margin-top: 8rpx; color: #8b97a6; font-size: 24rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-play { display: flex; width: 72rpx; height: 72rpx; flex: 0 0 72rpx; align-items: center; justify-content: center; border-radius: 50%; background: #f4f7fb; }
+.row-play-icon { width: 26rpx; height: 26rpx; margin-left: 4rpx; }
+.empty-panel { border-radius: 28rpx; background: #161c24; padding: 30rpx; }
+.empty-title { color: #f4f7fb; font-size: 34rpx; font-weight: 760; }
+.empty-copy { margin-top: 8rpx; color: #8b97a6; font-size: 28rpx; line-height: 1.45; }
 </style>

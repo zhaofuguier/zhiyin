@@ -90,18 +90,18 @@ text { display: block; }
 .title { margin-top: 10rpx; font-size: 42rpx; font-weight: 900; line-height: 1.18; }
 .copy { margin-top: 14rpx; color: rgba(255,255,255,.78); font-size: 28rpx; }
 .benefit-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12rpx; margin-top: 18rpx; }
-.benefit { min-height: 120rpx; border: 2rpx solid #e0e6e3; border-radius: 22rpx; background: rgba(255,255,255,.82); padding: 18rpx 15rpx; }
-.benefit-title { color: var(--zy-ink); font-size: 28rpx; font-weight: 850; }
-.benefit-copy { margin-top: 7rpx; color: var(--zy-muted); font-size: 26rpx; line-height: 1.4; }
+.benefit { min-height: 120rpx; border: 0; border-radius: 22rpx; background: #161c24; padding: 18rpx 15rpx; }
+.benefit-title { color: #f4f7fb; font-size: 28rpx; font-weight: 740; }
+.benefit-copy { margin-top: 7rpx; color: #8b97a6; font-size: 26rpx; line-height: 1.4; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 30rpx 2rpx 15rpx; }
-.section-title { color: var(--zy-ink); font-size: 34rpx; font-weight: 900; }
-.section-more { color: #a04f42; font-size: 26rpx; font-weight: 750; }
+.section-title { color: #f4f7fb; font-size: 34rpx; font-weight: 760; }
+.section-more { color: #e7a394; font-size: 26rpx; }
 .plans { display: flex; flex-direction: column; gap: 14rpx; }
-.plan { display: flex; width: 100%; align-items: center; gap: 18rpx; border: 2rpx solid #e0e6e3; border-radius: 24rpx; background: rgba(255,255,255,.84); padding: 22rpx; text-align: left; opacity: .72; }
+.plan { display: flex; width: 100%; align-items: center; gap: 18rpx; border: 0; border-radius: 24rpx; background: #161c24; padding: 22rpx; text-align: left; opacity: .86; }
 .plan-copy { flex: 1; min-width: 0; }
 .plan-name,.plan-benefits { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plan-name { color: var(--zy-ink); font-size: 32rpx; font-weight: 850; }
-.plan-benefits { margin-top: 7rpx; color: var(--zy-muted); font-size: 26rpx; }
-.price { width: 104rpx; color: var(--zy-primary); font-size: 36rpx; font-weight: 900; text-align: right; }
-.message { margin-top: 20rpx; border-radius: 18rpx; background: var(--zy-surface-soft); padding: 16rpx 18rpx; color: #526c67; font-size: 26rpx; line-height: 1.5; }
+.plan-name { color: #f4f7fb; font-size: 32rpx; font-weight: 740; }
+.plan-benefits { margin-top: 7rpx; color: #8b97a6; font-size: 26rpx; }
+.price { width: 104rpx; color: #7ee7d6; font-size: 36rpx; font-weight: 760; text-align: right; }
+.message { margin-top: 20rpx; border-radius: 18rpx; background: #161c24; padding: 16rpx 18rpx; color: #8b97a6; font-size: 26rpx; line-height: 1.5; }
 </style>

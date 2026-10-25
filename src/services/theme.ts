@@ -4,8 +4,8 @@ export type AppTheme = 'light' | 'dark';
 
 export function getTheme(): AppTheme {
   const value = uni.getStorageSync(THEME_KEY);
-  if (value === '深色' || value === 'dark') return 'dark';
-  return 'light';
+  if (value === '浅色' || value === 'light') return 'light';
+  return 'dark';
 }
 
 export function getThemeLabel(theme = getTheme()) {
@@ -23,18 +23,16 @@ export function toggleTheme() {
   return next;
 }
 
-export function applyTheme(theme = getTheme()) {
-  const isDark = theme === 'dark';
-
+export function applyTheme(_theme = getTheme()) {
   uni.setNavigationBarColor({
-    frontColor: isDark ? '#ffffff' : '#000000',
-    backgroundColor: isDark ? '#07111a' : '#f4f7f6'
+    frontColor: '#ffffff',
+    backgroundColor: '#0b0f14'
   });
 
   uni.setTabBarStyle({
-    color: isDark ? '#7f8d99' : '#8a97a4',
-    selectedColor: isDark ? '#f2f7fb' : '#152331',
-    backgroundColor: isDark ? '#07111a' : '#ffffff',
-    borderStyle: isDark ? 'black' : 'white'
+    color: '#9aa6b2',
+    selectedColor: '#7ee7d6',
+    backgroundColor: '#0b0f14',
+    borderStyle: 'black'
   });
 }

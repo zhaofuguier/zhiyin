@@ -16,6 +16,12 @@ export function contentExperience(contentForm?: string) {
   }
 }
 
+/** Spaces with an empty or unknown content form stay out of every on-screen pool. */
+export function hasVisibleContentForm(space: { contentForm?: string } | null | undefined): space is { contentForm: string } {
+  if (!space?.contentForm) return false;
+  return contentExperience(space.contentForm).label !== '类型待标注';
+}
+
 export function contentPlayLabel(contentForm: string | undefined, playing: boolean, position: number, duration: number) {
   if (playing) return '暂停';
   const experience = contentExperience(contentForm);

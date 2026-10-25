@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { contentExperience, contentPlayLabel } from '../src/services/content-experience.ts';
+import { contentExperience, contentPlayLabel, hasVisibleContentForm } from '../src/services/content-experience.ts';
 
 test('five confirmed forms expose distinct honest labels without guessing from titles', () => {
   const cases = [['silent-companion', '无声画面'], ['instrumental-music', '纯音乐'], ['nature-sound', '自然声音'], ['steady-noise', '稳定噪声'], ['guided-audio', '引导音频']];
@@ -10,6 +10,14 @@ test('five confirmed forms expose distinct honest labels without guessing from t
     assert.equal(contentExperience(form).label, '类型待标注');
     assert.equal(contentExperience(form).guided, false);
   }
+});
+
+test('missing content forms stay out of visible pools', () => {
+  assert.equal(hasVisibleContentForm(undefined), false);
+  assert.equal(hasVisibleContentForm({}), false);
+  assert.equal(hasVisibleContentForm({ contentForm: '' }), false);
+  assert.equal(hasVisibleContentForm({ contentForm: 'unknown' }), false);
+  assert.equal(hasVisibleContentForm({ contentForm: 'instrumental-music' }), true);
 });
 
 test('silent and guided controls distinguish starting, continuing, pausing and completed guides', () => {

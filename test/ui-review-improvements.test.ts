@@ -23,7 +23,7 @@ function favoritesRuntime() {
     '../../components/RequestStatePanel.vue': {}, '../../components/SingleAudioBar.vue': {},
     '../../services/assets': { DEFAULT_COVER_IMAGE: '' },
     '../../services/player': { formatDuration: String },
-    '../../services/content-experience': { contentExperience: () => ({ label: '类型待标注' }) },
+    '../../services/content-experience': { contentExperience: () => ({ label: '类型待标注' }), hasVisibleContentForm: () => true },
     '../../services/theme': { applyTheme() {} },
     '../../services/session': { getSessionToken: () => token },
     '../../services/session-scope': { promptLoginForAction: () => { prompts++; } },
@@ -73,13 +73,18 @@ test('anonymous favorites has explicit login and browsing actions, never an erro
   assert.doesNotMatch(template, /kind="error"[^>]*LOGIN_REQUIRED_MESSAGE/u);
 });
 
-test('home content precedes compact taxonomy with a single hero and all-scene route', () => {
+test('discover page leads with in-stock scene cards, then a playable today card', () => {
   const { template, styles } = parse(page('home')).descriptor;
-  assert.ok(template.content.indexOf('class="hero-card"') < template.content.indexOf('class="scene-grid"'));
+  assert.ok(template.content.indexOf('class="scene-grid"') < template.content.indexOf('class="hero-card"'));
   assert.equal((template.content.match(/class="hero-card"/gu) || []).length, 1);
-  assert.match(template.content, /v-for="scene in sceneTaxonomy.primaryScenes"/u);
-  assert.match(template.content, /@click="openScenes"/u);
-  assert.match(styles[0].content, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/u);
+  assert.match(template.content, /v-for="scene in entranceScenes"/u);
+  assert.match(template.content, /@click="openPrimaryScene\(scene\.id\)"/u);
+  assert.match(template.content, /今日音乐空间/u);
+  assert.match(template.content, /aria-label="播放"/u);
+  assert.match(template.content, /继续播放/u);
+  assert.match(template.content, /换一批/u);
+  assert.match(styles[0].content, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u);
+  assert.doesNotMatch(template.content, /类型待标注|学生专注空间|openStudentMode/u);
 });
 
 test('scene sort retains three options in one action menu without empty-page counter or automatic fallback', () => {

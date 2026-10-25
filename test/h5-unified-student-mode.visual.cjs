@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
 const baseUrl = process.env.H5_FIXTURE_URL || 'http://127.0.0.1:5188';
 const outputDir = resolve(process.env.H5_FIXTURE_OUTPUT || '../../outputs/ux/ZY-UX-04');
 const requests = [];
-const primaryNames = ['学习专注', '工作阅读', '睡前助眠', '放松休息', '深夜陪伴', '自然氛围', '亲子睡前'];
+const primaryNames = ['学习专注'];
 
 const fixtureSpace = {
   id: 'fixture-study-space', title: '隔离夹具学习空间', subtitle: '统一体验验收',

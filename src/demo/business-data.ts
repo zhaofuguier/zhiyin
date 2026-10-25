@@ -26,7 +26,7 @@ export function getDemoSchoolOptions(): SchoolSummary[] {
 export function getDemoMembershipPlans(): MembershipPlan[] {
   return [
     { level: 'plus', name: '知音 Plus 月卡', priceCents: 900, period: 'month', benefits: ['会员专属音乐空间', '高清微动画空间', '更多收藏容量'] },
-    { level: 'pro', name: '知音 Pro 年卡', priceCents: 6800, period: 'year', benefits: ['全部 Plus 权益', '下载与离线预留', '校园大使专属权益'] }
+    { level: 'pro', name: '知音 Pro 年卡', priceCents: 6800, period: 'year', benefits: ['全部 Plus 权益', '下载与离线预留', '更多精选音乐空间'] }
   ];
 }
 export function getDemoEntitlements(user: UserProfile): UserEntitlements {

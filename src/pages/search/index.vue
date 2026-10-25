@@ -6,7 +6,7 @@ import type { MusicSpace } from '../../types/music-space';
 import { getMusicSpacePage } from '../../services/api';
 import { DEFAULT_COVER_IMAGE } from '../../services/assets';
 import { formatDuration } from '../../services/player';
-import { contentExperience } from '../../services/content-experience';
+import { contentExperience, hasVisibleContentForm } from '../../services/content-experience';
 import { applyTheme } from '../../services/theme';
 import { requestErrorMessage } from '../../services/network';
 
@@ -27,7 +27,8 @@ let pendingKey = '';
 const quickKeywords = ['学习', '工作', '助眠', '放松', '深夜', '自然', '亲子'];
 const soundKeywords = ['轻音乐', '自然声音', '白噪音', '冥想'];
 const resultTitle = computed(() => (hasSearched.value ? '搜索结果' : '你想做什么'));
-const resultMeta = computed(() => (hasSearched.value && spaces.value.length ? `本页 ${spaces.value.length} 个` : ''));
+const resultMeta = computed(() => (hasSearched.value && visibleSpaces.value.length ? `本页 ${visibleSpaces.value.length} 个` : ''));
+const visibleSpaces = computed(() => spaces.value.filter((space) => hasVisibleContentForm(space)));
 
 async function runSearch(value = keyword.value, page = 1, paging = false) {
   const text = value.trim();
@@ -133,13 +134,13 @@ onUnload(() => { revision++; pendingKey = ''; });
       <text class="empty-copy">为你寻找适合此刻的音乐空间。</text>
     </view>
 
-    <view v-else-if="hasSearched && !errorMessage && !spaces.length" class="empty">
+    <view v-else-if="hasSearched && !errorMessage && !visibleSpaces.length" class="empty">
       <text class="empty-title">暂时没有匹配结果</text>
       <text class="empty-copy">可以换一个场景、情绪或关键词试试。</text>
     </view>
 
-    <view v-else-if="spaces.length" class="space-list">
-      <button v-for="space in spaces" :key="space.id" class="space-card" @click="openPlayer(space)">
+    <view v-else-if="visibleSpaces.length" class="space-list">
+      <button v-for="space in visibleSpaces" :key="space.id" class="space-card" @click="openPlayer(space)">
         <image class="cover" :src="space.coverImageUrl" mode="aspectFill" @error="useFallbackCover(space)" />
         <view class="space-shade">
           <view>
@@ -164,26 +165,26 @@ onUnload(() => { revision++; pendingKey = ''; });
 </template>
 
 <style scoped>
-.page { min-height: 100vh; box-sizing: border-box; padding: 22rpx 24rpx calc(52rpx + env(safe-area-inset-bottom)); background: var(--zy-bg); color: var(--zy-ink); }
+.page { min-height: 100vh; box-sizing: border-box; padding: 22rpx 24rpx calc(52rpx + env(safe-area-inset-bottom)); background: #0b0f14; color: #eef3f7; }
 button { box-sizing: border-box; line-height: normal; margin: 0; }
 button::after { border: 0; }
 text { display: block; }
-.search-panel { display: grid; grid-template-columns: minmax(0,1fr) 108rpx; gap: 10rpx; margin-bottom: 30rpx; border: 2rpx solid var(--zy-border); border-radius: 999rpx; background: #fff; padding: 8rpx; box-shadow: 0 8rpx 24rpx rgba(20,43,39,.04); }
-.search-input { height: 68rpx; padding: 0 20rpx; color: var(--zy-ink); font-size: 30rpx; }
-.search-action { height: 68rpx; border: 0; border-radius: 999rpx; background: var(--zy-primary); padding: 0; color: #fff; font-size: 28rpx; font-weight: 850; white-space: nowrap; }
+.search-panel { display: grid; grid-template-columns: minmax(0,1fr) 108rpx; gap: 10rpx; margin-bottom: 30rpx; border: 0; border-radius: 999rpx; background: #161c24; padding: 8rpx; }
+.search-input { height: 68rpx; padding: 0 20rpx; color: #eef3f7; font-size: 30rpx; }
+.search-action { height: 68rpx; border: 0; border-radius: 999rpx; background: #7ee7d6; padding: 0; color: #0b0f14; font-size: 28rpx; font-weight: 760; white-space: nowrap; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 2rpx 16rpx; }
-.section-title { color: var(--zy-ink); font-size: 34rpx; font-weight: 900; }
-.section-more { color: var(--zy-muted); font-size: 26rpx; font-weight: 650; }
+.section-title { color: #f4f7fb; font-size: 34rpx; font-weight: 760; }
+.section-more { color: #8b97a6; font-size: 26rpx; }
 .quick-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14rpx; }
 .sound-keywords { margin-top:28rpx; }
 .sound-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14rpx; margin-top:16rpx; }
-.quick-chip { min-height: 78rpx; border: 2rpx solid #e0e6e3; border-radius: 22rpx; background: rgba(255,255,255,.82); color: #294b46; font-size: 30rpx; font-weight: 800; }
-.quick-chip.active { border-color: var(--zy-primary); background: var(--zy-primary); color: #fff; }
-.empty { border: 2rpx solid #e0e6e3; border-radius: 28rpx; background: rgba(255,255,255,.84); padding: 36rpx 28rpx; }
-.empty-title { color: var(--zy-ink); font-size: 34rpx; font-weight: 850; }
-.empty-copy { margin-top: 9rpx; color: var(--zy-muted); font-size: 28rpx; line-height: 1.45; }
+.quick-chip { min-height: 78rpx; border: 0; border-radius: 22rpx; background: #161c24; color: #d5dee6; font-size: 30rpx; font-weight: 700; }
+.quick-chip.active { background: #1c3f3a; color: #7ee7d6; }
+.empty { border-radius: 28rpx; background: #161c24; padding: 36rpx 28rpx; }
+.empty-title { color: #f4f7fb; font-size: 34rpx; font-weight: 760; }
+.empty-copy { margin-top: 9rpx; color: #8b97a6; font-size: 28rpx; line-height: 1.45; }
 .space-list { display: grid; gap: 18rpx; }
-.space-card { position: relative; overflow: hidden; width: 100%; height: auto; aspect-ratio: 16/9; border: 2rpx solid #d6dfdb; border-radius: 28rpx; background: #dbe5e1; padding: 0; text-align: left; box-shadow: 0 14rpx 36rpx rgba(20,43,39,.09); }
+.space-card { position: relative; overflow: hidden; width: 100%; height: auto; aspect-ratio: 16/9; border: 0; border-radius: 28rpx; background: #161c24; padding: 0; text-align: left; }
 .cover { width: 100%; height: 100%; filter: saturate(.9) contrast(1.02) brightness(.94); }
 .space-shade { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: space-between; padding: 24rpx; background: linear-gradient(180deg,rgba(4,17,18,.02) 28%,rgba(4,17,18,.82)); }
 .space-title,.space-subtitle { max-width: 510rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -192,7 +193,7 @@ text { display: block; }
 .play-dot { display: flex; width: 58rpx; height: 58rpx; flex: 0 0 58rpx; align-items: center; justify-content: center; border: 2rpx solid rgba(255,255,255,.56); border-radius: 50%; background: rgba(255,255,255,.14); }
 .play-icon { width: 27rpx; height: 27rpx; filter: brightness(0) invert(1); }
 .search-action:active,.quick-chip:active,.space-card:active { opacity: .88; }
-.pagination { margin-top: 24rpx; color: var(--zy-muted); font-size: 26rpx; }
+.pagination { margin-top: 24rpx; color: #8b97a6; font-size: 26rpx; }
 .pagination-buttons { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; }
 .pagination button { padding: 16rpx 24rpx; border-radius: 16rpx; font-size: 26rpx; }
 .pagination button[disabled] { opacity: .45; }

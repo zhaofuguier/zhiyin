@@ -30,13 +30,13 @@ onShow(() => getSingleAudioCoordinator().handleApplicationShow());
 
 <style>
 page {
-  --zy-bg: #f5f7f4;
-  --zy-surface: #ffffff;
-  --zy-surface-soft: #eef4f1;
-  --zy-primary: #17675d;
-  --zy-ink: #12312d;
-  --zy-muted: #73827f;
-  --zy-border: #d8e1dd;
+  --zy-bg: #0b0f14;
+  --zy-surface: #161c24;
+  --zy-surface-soft: #1c2530;
+  --zy-primary: #7ee7d6;
+  --zy-ink: #eef3f7;
+  --zy-muted: #8b97a6;
+  --zy-border: #2a3542;
   background: var(--zy-bg);
   color: var(--zy-ink);
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
@@ -48,7 +48,7 @@ button { font: inherit; touch-action: manipulation; }
 html,
 body {
   min-height: 100%;
-  background: #d8d5cc;
+  background: #07090c;
 }
 
 @media (min-width: 431px) {
@@ -69,7 +69,7 @@ body {
   margin: 0 auto;
   overflow: visible;
   background: var(--zy-bg);
-  box-shadow: 0 0 56px rgba(20, 31, 29, 0.18);
+  box-shadow: 0 0 56px rgba(0, 0, 0, 0.45);
 }
 
 uni-app,

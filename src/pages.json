@@ -3,13 +3,15 @@
     {
       "path": "pages/home/index",
       "style": {
-        "navigationBarTitleText": "知音"
+        "navigationBarTitleText": "知音",
+        "navigationStyle": "custom"
       }
     },
     {
       "path": "pages/categories/index",
       "style": {
-        "navigationBarTitleText": "场景"
+        "navigationBarTitleText": "场景",
+        "navigationStyle": "custom"
       }
     },
     {
@@ -75,16 +77,16 @@
     }
   ],
   "globalStyle": {
-    "navigationBarTextStyle": "black",
+    "navigationBarTextStyle": "white",
     "navigationBarTitleText": "知音",
-    "navigationBarBackgroundColor": "#f4f7f6",
-    "backgroundColor": "#f4f7f6"
+    "navigationBarBackgroundColor": "#0b0f14",
+    "backgroundColor": "#0b0f14"
   },
   "tabBar": {
-    "color": "#8a97a4",
-    "selectedColor": "#152331",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "white",
+    "color": "#9aa6b2",
+    "selectedColor": "#7ee7d6",
+    "backgroundColor": "#0b0f14",
+    "borderStyle": "black",
     "list": [
       {
         "pagePath": "pages/home/index",
