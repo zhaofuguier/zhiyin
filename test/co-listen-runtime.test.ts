@@ -163,6 +163,34 @@ test('source contains no copy invite, manual invite code or cross-platform room 
   assert.doesNotMatch(playerPage, /2\s*小时/u);
 });
 
+test('leaving or closing a co-listen room destroys the inner audio context', () => {
+  const playerPage = readFileSync(join(root, 'src', 'pages', 'player', 'index.vue'), 'utf8');
+  const closedBranch = playerPage.slice(playerPage.indexOf("event.event === 'room-closed'"), playerPage.indexOf("event.event === 'error'"));
+  const clearBody = functionBody(playerPage, 'clearCoListenLocalState');
+  const resetBody = functionBody(playerPage, 'resetAudioContext');
+  assert.match(functionBody(playerPage, 'exitCoListenRoom'), /clearCoListenLocalState\(\)/u);
+  assert.match(closedBranch, /clearCoListenLocalState\(\)/u);
+  assert.match(clearBody, /resetAudioContext\(\)/u);
+  assert.match(resetBody, /mediaLifecycle\.destroyAudio\(\)/u);
+  assert.equal(playerPage.match(/clearCoListenLocalState\(\)/gu)?.length, 3);
+});
+
+function functionBody(source: string, name: string): string {
+  const start = source.indexOf(`function ${name}(`);
+  assert.ok(start >= 0, name);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(open, index + 1);
+    }
+  }
+  throw new Error(`UNCLOSED_${name}`);
+}
+
 function createdRoom() {
   return { inviteToken: 'i'.repeat(43), selfParticipantId: 'participant-owner', room: {
     roomId: 'room-1', platform: 'wechat', musicSpaceId: 'space-1', ownerParticipantId: 'participant-owner',

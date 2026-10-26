@@ -17,8 +17,8 @@
                     "build:mp-weixin:prod":  "node tools/miniapp-build.cjs --mode=production --platform=mp-weixin",
                     "build:mp-toutiao:prod":  "node tools/miniapp-build.cjs --mode=production --platform=mp-toutiao",
                     "build:miniapps:prod":  "npm.cmd run build:mp-toutiao:prod \u0026\u0026 npm.cmd run build:mp-weixin:prod",
-                    "typecheck":  "node ../../tools/verify-feedback-catalog.cjs && vue-tsc --noEmit",
-                    "test":  "node ../../tools/verify-feedback-catalog.cjs && node --experimental-strip-types --test test/*.test.ts"
+                    "typecheck":  "node tools/verify-feedback-catalog.cjs && vue-tsc --noEmit",
+                    "test":  "node tools/verify-feedback-catalog.cjs && node --experimental-strip-types --test test/*.test.ts"
                 },
     "dependencies":  {
                          "@dcloudio/uni-app":  "3.0.0-alpha-5010220260604001",
@@ -26,14 +26,14 @@
                          "@dcloudio/uni-h5":  "3.0.0-alpha-5010220260604001",
                          "@dcloudio/uni-mp-toutiao":  "3.0.0-alpha-5010220260604001",
                          "@dcloudio/uni-mp-weixin":  "3.0.0-alpha-5010220260604001",
-                         "pinia":  "latest",
-                         "vue":  "latest"
+                         "pinia":  "3.0.4",
+                         "vue":  "3.5.35"
                      },
     "devDependencies":  {
                             "@dcloudio/types":  "3.4.31",
                             "@dcloudio/vite-plugin-uni":  "3.0.0-alpha-5010220260604001",
-                            "typescript":  "latest",
-                            "vite":  "latest",
-                            "vue-tsc":  "latest"
+                            "typescript":  "6.0.3",
+                            "vite":  "5.2.8",
+                            "vue-tsc":  "3.3.3"
                         }
 }

@@ -359,6 +359,8 @@ async function exitCoListenRoom() {
 }
 
 function clearCoListenLocalState() {
+  resetAudioContext();
+  isPlaying.value = false;
   coListenRealtime.disconnect();
   coListenRoom.value = undefined;
   coListenSelfParticipantId.value = '';
